@@ -1,0 +1,1020 @@
+<?
+/**************************************************************************
+ *  PAEV - PHP Adjusted Earned Value                                      *
+ *          (paev.JS-X.com)                                               *
+ *                                                                        *
+ *  This program is free software: you can redistribute it and/or modify  *
+ *  it under the terms of the GNU General Public License as published by  *
+ *  the Free Software Foundation, either version 3 of the License, or     *
+ *  any later version.                                                    *
+ *                                                                        *
+ *  This program is distributed in the hope that it will be useful,       *
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *  GNU General Public License for more details.                          *
+ *                                                                        *
+ *  You should have received a copy of the GNU General Public License     *
+ *  along with this program.  If not, see <http://www.gnu.org/licenses/>. *
+ **************************************************************************/
+
+/******************************************/
+/* HEADER: INCLUDE/SECURITY CHECK - START */
+/******************************************/
+$HACK_CHECK=1; Include("config/global.inc.php");
+debug(10,"Loading File: tasks.php");
+debug(10,"User Level is DB-Admin (".$_SESSION['dbAdmin'].")");
+checkPermissions($SESSION_TIMEOUT); // if not logged in, or session has timed out...
+/******************************************/
+/* HEADER: INCLUDE/SECURITY CHECK - END   */
+/******************************************/
+
+/********************************************
+*	        PERMISSIONS CHECK	    *
+********************************************/
+$strProject =isset($_FORM['txt_project'])?postedData($_FORM['txt_project']):0;
+if(isset($_REQUEST['txt_project'])){
+   $strProject = postedData($_REQUEST['txt_project']);
+}
+$strProject = getProject($strProject);
+
+$userId = $_SESSION['paev_userID'];
+$projectAdmin = isProjectAdmin($strProject, $userId);
+$dbAdmin = $_SESSION['dbAdmin'];
+
+$USER_ACCESS=accessLevel($strProject);
+debug(10,"User is a DB-Admin if this is a 1(".$_SESSION['dbAdmin'].")");
+debug(10,"User is a Admin for project($strProject) if this is a $ACCESS_ADMIN($USER_ACCESS)");
+debug(10,"User is a 'USER' for project($strProject) if this is a $ACCESS_USER($USER_ACCESS)");
+/********************************************
+*	    END PERMISSIONS CHECK	    *
+********************************************/
+if($strProject > 0){
+   $checkProject = "SELECT project_id FROM pev__project WHERE project_id=$strProject";
+   $projRow = mysql_fetch_array(dbquery($checkProject));
+   if($projRow['project_id'] == NULL){
+      set_status("Please select a project");
+      $TITLE="Project Tasks";
+      show_header();
+      show_menu("PROJECTS");
+      show_status();
+      projectSelector("tasks.php", 0);
+      show_footer();
+      exit;
+   }
+}
+
+
+set_todo("lock the DB on posts - validate that the data posting is for data viewed - and that someone has not saved before us and we lost their data.");
+set_todo("think about adding ability to show history per person per wbs... ?");
+
+/******************************************/
+/* COMPUTING - NO OUTPUT - START          */
+/******************************************/
+
+//Record history by grabbing data from the table an putting it into the history table
+if(isset($_FORM['txt_action2']) && $_FORM['txt_action2'] == "Record History"){
+   recordHistory($strProject);
+} // end - Record History 
+
+
+if(isset($_FORM['txt_action2']) && ($_FORM['txt_action2'] == "mfs3" || $_FORM['txt_action2'] == "mfs3_locked")) /* update */
+{
+        $strROW     =isset($_FORM['tmp_row'])?postedData($_FORM['tmp_row']):"tblrow0";
+  	$strTID     =isset($_FORM['tmp_taskid'])?validInt($_FORM['tmp_taskid']):"";
+  	$strName    =isset($_FORM['tmp_name'])?postedData($_FORM['tmp_name']):"";
+  	$strDel1    =isset($_FORM['tmp_del1'])?postedData($_FORM['tmp_del1']):0;
+  	$strDel2    =isset($_FORM['tmp_del2'])?postedData($_FORM['tmp_del2']):0;
+
+  	debug(10,"UPDATE ACTION POSTED:MFS3 (Taskid:$strTID P:$strProject, N:$strName, D1:$strDel1, D2:$strDel2)");
+
+  	if($strDel1 && $strDel2) /* then delete */
+  	{
+    		$strSQL0 = "DELETE FROM $TABLE_TASK WHERE task_id='$strTID'";
+    		$result0 = dbquery($strSQL0);
+    		set_status("Task $strName deleted. ($strTID)");
+
+    		$strSQL0 = "SELECT A.person_to_wbstask_id FROM $TABLE_PERSON_TO_WBSTASK AS A";
+    		$strSQL0.= " LEFT JOIN $TABLE_WBS_TO_TASK AS B ON A.wbs_to_task_id=B.wbs_to_task_id";
+    		$strSQL0.= " WHERE B.task_id='$strTID'";
+    		$result0 = dbquery($strSQL0);
+    		while($row0 = mysql_fetch_array($result0))
+    		{
+      			$strSQL1 = "DELETE FROM $TABLE_PERSON_TO_WBSTASK WHERE person_to_wbstask_id='".$row0['person_to_wbstask_id']."'";
+      			$result1 = dbquery($strSQL1);
+      			set_status("Person-to-WBS-Task Removed. (".$row0['person_to_wbstask_id'].")");
+    		}
+    		$strSQL0 = "DELETE FROM $TABLE_WBS_TO_TASK WHERE task_id='$strTID'";
+    		$result0 = dbquery($strSQL0);
+    		set_status("WBS-to-Tasks deleted. ($strTID)");
+  	}
+  	else /* UPDATE */
+  	{
+    		$strSQL1 = "UPDATE $TABLE_TASK SET";
+    		$strSQL1.= " task_name='$strName'";
+    		$strSQL1.= ",project_id='$strProject'";
+    		$strSQL1.= " WHERE task_id='$strTID'";
+    		$result1 = dbquery($strSQL1);
+    		set_status("Success: TASK $strName ($strTID) Updated - INFO updated.");
+  	}
+}
+
+
+if(isset($_FORM['txt_action2']) && ($_FORM['txt_action2'] == "mfs1" || $_FORM['txt_action2'] == "mfs1_locked")) /* update */
+{
+  	$strROW    =isset($_FORM['tmp_row'])?postedData($_FORM['tmp_row']):"tblrow0";
+  	$strTID    =isset($_FORM['tmp_taskid'])?validInt($_FORM['tmp_taskid']):"";
+  	$strWID    =isset($_FORM['tmp_wbsid'])?validInt($_FORM['tmp_wbsid']):"";
+  	$strPOC    =isset($_FORM['tmp_poc'])?postedData($_FORM['tmp_poc']):"";
+  	$strDUE    =isset($_FORM['tmp_due'])?date_save(postedData($_FORM['tmp_due'])):"";
+  	$strEC     =isset($_FORM['tmp_ec'])?date_save(postedData($_FORM['tmp_ec'])):"";
+        if($strEC == null){
+           $strEC = $strDUE;
+        }
+  	$strPH     =isset($_FORM['tmp_ph'])?validFloat($_FORM['tmp_ph']):0;
+  	$strAH     =isset($_FORM['tmp_ah'])?validFloat($_FORM['tmp_ah']):0;
+  	$strPC     =isset($_FORM['tmp_pc'])?validInt($_FORM['tmp_pc']):0;
+  	$strDel1   =isset($_FORM['tmp_del1'])?postedData($_FORM['tmp_del1']):0;
+  	$strDel2   =isset($_FORM['tmp_del2'])?postedData($_FORM['tmp_del2']):0;
+  	debug(10,"UPDATE ACTION POSTED (Taskid:$strTID P:$strProject, W:$strWID, POC:$strPOC, DUE:$strDUE, EC:$strEC, PH,$strPH, AH,$strAH, PC,$strPC, D1:$strDel1, D2:$strDel2)");
+  	if($strDel1 && $strDel2) /* then delete */
+  	{
+   		$strSQL3 = "SELECT wbs_to_task_id FROM $TABLE_WBS_TO_TASK";
+    		$strSQL3.= " WHERE wbs_id='$strWID' AND task_id='$strTID'";
+    		$result3 = dbquery($strSQL3);
+    		while($row3 = mysql_fetch_array($result3))
+    		{
+      			$strSQL4 = "DELETE FROM $TABLE_PERSON_TO_WBSTASK";
+      			$strSQL4.= " WHERE wbs_to_task_id='".$row3['wbs_to_task_id']."'";
+      			$result4 = dbquery($strSQL4);
+      			set_status("Success: Deleted person assigned to task (".$row3['wbs_to_task_id'].").");
+    		}
+    		$strSQL4 = "DELETE FROM $TABLE_WBS_TO_TASK";
+    		$strSQL4.= " WHERE wbs_id='$strWID' AND task_id='$strTID'";
+    		$result4 = dbquery($strSQL4);
+    		set_status("Success: WBS ($strWID) deleted.");
+  	}
+  	else /* GO DO INSERT or UPDATE */
+  	{
+
+                //Check to see if this project is a revision. If so, all due dates and ec dates cannot be before the first history date
+                $getProjRev = "SELECT revision FROM pev__project WHERE project_id='$strProject'";
+                $revResult = dbquery($getProjRev);
+                $revRow = mysql_fetch_array($revResult);
+                if($revRow['revision'] > 0){
+                   //Check due dates and ec_dates
+                   $getFirstHistory = "SELECT start_date FROM pev__project WHERE project_id='$strProject'";
+                   $historyResult = dbquery($getFirstHistory);
+                   $historyRow = mysql_fetch_array($historyResult);
+                   if($historyRow['start_date'] == NULL){
+                      set_error("This re-plan phase does not have a start date. This may cause inconsistancies in project graphs.");
+                   }else{
+                      if($strDUE < $historyRow['start_date'] || $strDUE == NULL){
+                         if($strDUE != NULL){
+                            $strDUE = $historyRow['start_date'];
+                            set_error("Due date cannot be before the start of this re-plan phase. Date changed to start of this re-plan.");
+                         }
+                      }
+                      if($strEC < $historyRow['start_date']){
+                         $strEC = $historyRow['start_date'];
+                         set_error("EC date cannot be before the start of this re-plan phase. Date changed to start of this re-plan.");
+                      }
+                   }
+                }
+
+                //Continue with the insert/update
+  		$strSQL3 = "SELECT wbs_to_task_id FROM $TABLE_WBS_TO_TASK";
+  		$strSQL3.= " WHERE wbs_id='$strWID' AND task_id='$strTID'";
+  		$result3 = dbquery($strSQL3);
+  		if($row3 = mysql_fetch_array($result3))
+  		{
+    			$strSQL4 = "UPDATE $TABLE_WBS_TO_TASK SET";
+    			$strSQL4.= " wbs_id='$strWID'";
+    			$strSQL4.= ",task_id='$strTID'";
+                        if(isset($_FORM['tmp_due'])){
+    			   $strSQL4.= ",due_date='$strDUE'";
+                        }
+    			$strSQL4.= ",ec_date='$strEC'";
+                        if(isset($_FORM['tmp_ph'])){
+    			   $strSQL4.= ",planned_hours='$strPH'";
+                        }
+    			$strSQL4.= ",actual_hours='$strAH'";
+    			$strSQL4.= ",percent_complete='$strPC'";
+    			$strSQL4.= " WHERE wbs_to_task_id='".$row3['wbs_to_task_id']."'";
+    			$result4 = dbquery($strSQL4);
+    			$NEW_WBS_TO_TASK_ID=$row3['wbs_to_task_id'];
+    			set_status("Success: WBS ($strTID) INFO updated. (WBS_TO_TASK_ID:".$row3['wbs_to_task_id'].")");
+  		}
+  		else
+  		{
+                        if(!isset($_FORM['tmp_due'])){
+                           set_error("Error: An activity cannot be created while a project is locked");
+                        }else{
+    			   $strSQL3 = "INSERT INTO $TABLE_WBS_TO_TASK SET";
+    			   $strSQL3.= " wbs_id='$strWID'";
+    			   $strSQL3.= ",task_id='$strTID'";
+    			   $strSQL3.= ",due_date='$strDUE'";
+    			   $strSQL3.= ",ec_date='$strEC'";
+    			   $strSQL3.= ",planned_hours='$strPH'";
+    			   $strSQL3.= ",actual_hours='$strAH'";
+    			   $strSQL3.= ",percent_complete='$strPC'";
+    			   $result3 = dbquery($strSQL3);
+    			   $strSQL4 = "SELECT last_insert_id()";
+    			   $result4 = dbquery($strSQL4);
+    			   $row4 = mysql_fetch_array($result4);
+    			   $NEW_WBS_TO_TASK_ID=$row4[0];
+    			   set_status("Success: WBS ($strWID) INFO inserted. (WBS_TO_TASK_ID:$NEW_WBS_TO_TASK_ID)");
+                        }
+  		}
+  		$strSQL5 = "DELETE FROM $TABLE_PERSON_TO_WBSTASK WHERE wbs_to_task_id='$NEW_WBS_TO_TASK_ID'";
+  		$result5 = dbquery($strSQL5);
+  		if($strPOC) /* then they put in data */
+  		{
+    			$strSQL5 = "INSERT INTO $TABLE_PERSON_TO_WBSTASK SET";
+    			$strSQL5.= " wbs_to_task_id='$NEW_WBS_TO_TASK_ID'";
+    			$strSQL5.= ",person_id='$strPOC'";
+    			$result5 = dbquery($strSQL5);
+    			set_status("Success: POC ($strPOC) updated to WBSTASK ($NEW_WBS_TO_TASK_ID).");
+  		}
+  	}
+}
+
+//Add more tasks to the table
+if(isset($_FORM['txt_action2']) && $_FORM['txt_action2'] == "Add")
+{
+  	$strTaskName    =isset($_FORM['txt_taskname'])?postedData($_FORM['txt_taskname']):"";
+  	//$strScopeGrowth =isset($_FORM['txt_scopegrowth'])?validInt($_FORM['txt_scopegrowth']):0;
+  	$strHowMany     =isset($_FORM['txt_howmany'])?validInt($_FORM['txt_howmany']):0;
+  	debug(10,"ADD ACTION POSTED (P:$strProject, N:$strTaskName, H:$strHowMany)");
+        //Get revision number so it can be added to the task
+        $getSG = "SELECT revision, locked FROM pev__project WHERE project_id='$strProject'";
+        $sgResult = dbquery($getSG);
+        $sgRow = mysql_fetch_array($sgResult);
+        $strScopeGrowth = $sgRow['revision'];
+        $locked = $sgRow['locked'];
+        if(!$locked){
+           //This project is unlocked so tasks may be added
+  	   for($i=0;$i<$strHowMany;$i++)
+  	   {
+    		$strSQL1 = "INSERT INTO $TABLE_TASK SET";
+    		$strSQL1.= " task_name='$strTaskName'";
+    		$strSQL1.= ",scope_growth='$strScopeGrowth'";
+    		$strSQL1.= ",project_id='$strProject'";
+    		$result1 = dbquery($strSQL1);
+    		$strSQL2 = "SELECT last_insert_id()";
+    		$result2 = dbquery($strSQL2);
+    		$row2 = mysql_fetch_array($result2);
+    		$NEW_TASK_ID=$row2[0];
+    		debug(10,"new TASK ID (".$row2[0].")");
+    		set_status("Success: Task($NEW_TASK_ID) created.");
+  	   }
+        }else{
+           //This project is locked, an error occurred.
+           set_error("Error: This project is locked. Tasks may not be added");
+        }
+}
+
+
+
+/******************************************/
+/* COMPUTING - NO OUTPUT - END            */
+/******************************************/
+
+
+/******************************************/
+/* COMPUTING - SHOW OUTPUT - START        */
+/******************************************/
+if(isset($_REQUEST['previous']) && $_REQUEST['previous'] == 1){
+
+   $this_project = postedData($_REQUEST['this_proj']);
+   //Only display the table if a user is viewing a previous version.
+   $getPrevious = "SELECT project_id FROM pev__project WHERE associated_id='$this_project' LIMIT 1";
+   $result = dbquery($getPrevious);
+   $row = mysql_fetch_array($result);
+   $str_project = $row['project_id'];
+
+   /* do the dbquery outside the select list so the debug will appear */
+   $strSQL1 = "SELECT project_name FROM $TABLE_PROJECT";
+   $strSQL1.= " WHERE project_id='$str_project'";
+   $result1 = dbquery($strSQL1);
+   $row1 = mysql_fetch_array($result1);
+   $str_projectName = $row1['project_name'];
+   $cur_project = $strProject;
+
+   show_header();
+   displayTable();
+   show_footer();
+   exit;
+}
+
+
+$TITLE="Project Tasks";
+show_header();
+show_menu("PROJECTS");
+show_status();
+show_error();
+
+?>
+<script type="text/javascript" src="modalbox/lib/prototype.js"></script>
+<script type="text/javascript" src="modalbox/lib/scriptaculous.js"></script>
+<script type="text/javascript" src="modalbox/modalbox.js"></script>
+<script type="text/javascript" src="scripts/tasks.js"></script>
+<?if(isset($strROW)){?>
+<script>
+window.onload = function(){
+   $('<?=$strROW;?>').scrollTo();
+}
+</script>
+<?}?>
+<link rel="stylesheet" href="modalbox/modalbox.css" type="text/css" media="screen">
+
+<?
+
+$DATE_POP_COUNTER=0;
+
+/* SHOW THE PROJECT TO VIEW/EDIT */
+if(isset($_FORM['txt_action']) && $_FORM['txt_action'] == "Do Now" || $strProject)
+{
+  //$str_project=isset($_FORM['txt_project'])?postedData($_FORM['txt_project']):"";
+  $str_project=$strProject;
+  $cur_project=$strProject;
+?>
+<form name="msf1" action="<?=$PAGE_TASK;?>" method="POST">
+	<input type="hidden" name=txt_action2 value='mfs1'>
+	<input type="hidden" value="<?=$str_project;?>" name="txt_project">
+	<input type="hidden" value="Do Now" name="txt_action">
+        <input type="hidden" name="tmp_row">
+	<input type="hidden" name="tmp_taskid">
+	<input type="hidden" name="tmp_wbsid">
+	<input type="hidden" name="tmp_poc">
+	<input type="hidden" name="tmp_due">
+	<input type="hidden" name="tmp_ec">
+	<input type="hidden" name="tmp_ph">
+	<input type="hidden" name="tmp_ah">
+	<input type="hidden" name="tmp_pc">
+	<input type="hidden" name="tmp_del1">
+	<input type="hidden" name="tmp_del2">
+</form>
+<form name="msf1_locked" action="<?=$PAGE_TASK;?>" method="POST">
+	<input type="hidden" name=txt_action2 value='mfs1_locked'>
+	<input type="hidden" value="<?=$str_project;?>" name="txt_project">
+	<input type="hidden" value="Do Now" name="txt_action">
+        <input type="hidden" name="tmp_row">
+	<input type="hidden" name="tmp_taskid">
+	<input type="hidden" name="tmp_wbsid">
+	<input type="hidden" name="tmp_poc">
+	<input type="hidden" name="tmp_ec">
+	<input type="hidden" name="tmp_ah">
+	<input type="hidden" name="tmp_pc">
+</form>
+<form name="msf3" action="<?=$PAGE_TASK;?>" method="POST">
+	<input type="hidden" name="txt_action2" value="mfs3">
+	<input type="hidden" value="<?=$str_project;?>" name="txt_project">
+	<input type="hidden" value="Do Now" name="txt_action">
+        <input type="hidden" name="tmp_row">
+	<input type="hidden" name="tmp_taskid">
+	<input type="hidden" name="tmp_name">
+	<input type="hidden" name="tmp_del1">
+	<input type="hidden" name="tmp_del2">
+</form>
+<form name="msf3_locked" action="<?=$PAGE_TASK;?>" method="POST">
+	<input type="hidden" name="txt_action2" value="mfs3_locked">
+	<input type="hidden" value="<?=$str_project;?>" name="txt_project">
+	<input type="hidden" value="Do Now" name="txt_action">
+        <input type="hidden" name="tmp_row">
+	<input type="hidden" name="tmp_taskid">
+	<input type="hidden" name="tmp_name">
+</form>
+<form name=na action="<?=$PAGE_TASK;?>" method="POST">
+	<input type="hidden" value='Do Now' name="txt_action">
+	<input type="hidden" value='' name="txt_project">
+	<input type="hidden" value='' name="txt_action2">
+	<input type="hidden" value='' name="txt_wbs_id">
+	<input type="hidden" value='' name="txt_task_id">
+</form>
+
+
+
+<?
+   /* do the dbquery outside the select list so the debug will appear */
+   $strSQL1 = "SELECT project_name FROM $TABLE_PROJECT";
+   $strSQL1.= " WHERE project_id='$str_project'";
+   $result1 = dbquery($strSQL1);
+   $row1 = mysql_fetch_array($result1);
+   $str_projectName = $row1['project_name'];
+
+?>
+<BR>
+<div id="hiddenrowcol">
+	<fieldset>
+		<legend><b>Table Options</b></legend>
+		<ul>
+			<li><b>Double-click task name to hide row</b></li>
+			<li><b>Double-click WBS name to hide column</b></li>
+		</ul>
+		<table align="center" class="list">
+			<tr>
+				<th>&nbsp;Hidden WBS Columns&nbsp;</th>
+				<th>&nbsp;Hidden Tasks&nbsp;</th>
+				<th>Swap WBS Column</th>
+			</tr>
+			<tr>
+				<td align="center">
+					<br>
+					<select multiple size="5" id="showmycols">
+
+					</select>
+					<br><br>
+					<input class="but" type="button" value="Show Columns" onclick="return showColumn()">
+				</td>
+				<td align="center">
+					<br>
+					<select multiple size="5" id="showmyrows">
+
+					</select>
+					<br><br>
+					<input class="but" type="button" value="Show Tasks" onclick="return showrows()">
+				</td>
+				<td>	
+					<select id="wbs1">
+<?
+$strSQL10 = "SELECT P.project_name,W.wbs_id,W.wbs_name,W.wbs_order FROM $TABLE_WBS AS W ";
+$strSQL10.= " LEFT JOIN $TABLE_PROJECT AS P ON P.project_id=W.project_id";
+$strSQL10.= " WHERE P.project_id='$str_project'";
+$strSQL10.= " ORDER BY W.wbs_order ASC, W.wbs_name ASC";
+$result10 = dbquery($strSQL10);
+//This sets up the first selection box for swapping wbs columns in the table
+$colno = 3;
+while($row10 = mysql_fetch_array($result10)){
+	$wbsname = $row10['wbs_name'];
+	echo "\t\t\t\t\t\t<option value=\"$colno\">$wbsname</option>\n";
+	$colno += 6; 
+}
+?>
+					</select> with:
+					<select class="hidden" id="wbs2">
+<?
+//This sets up the second selection box, just like the first
+$colno = 3;
+$result11 = dbquery($strSQL10);
+while($row11 = mysql_fetch_array($result11)){
+	$wbsname = $row11['wbs_name'];
+	echo "\t\t\t\t\t\t<option value=\"$colno\">$wbsname</option>\n";
+	$colno += 6; 
+}
+?>
+					</select>
+					<input class="but" type="button" value="Swap" onclick="return swapMaker()">
+				</td>
+			</tr>
+		</table>
+	</fieldset>
+</div>
+
+<input class="but" type="button" id="openhiderowcol" value="Expand Table Options" onclick="return openhide('hiddenrowcol','openhiderowcol')">
+<br/><br/><br/><br/>
+<script>
+//Collapse all table options
+openhide('hiddenrowcol','openhiderowcol');
+</script>
+
+<?displayTable();?>
+
+<div id="projectSelectorDiv">
+<?
+} /* end of showing a project's tasks/wbs */
+projectSelector('tasks.php', $strProject);
+
+?>
+</div>
+
+<fieldset>
+	<legend><b>NOTES</b></legend>
+	<ul>
+		<li>Double-click task names to hide rows; Double-click WBS names to hide WBS</li>
+		<li>Click on Sub-Headers to sort columns</li>
+		<li>Scope Growth is a new task defined after the baseline.</li>
+		<li>Adding a new task after the baseline that is not scope growth would have 0(zero) for the planned hours...</li>
+		<li>Dates are in format: MM/DD/YYYY</li>
+	</ul>
+</fieldset>
+
+
+<?
+show_footer();
+
+
+function displayTable(){
+   global $project_status;
+   global $str_projectName;
+   global $project_status;
+   global $str_project;
+   global $cur_project;
+   global $ACCESS_ADMIN;
+   global $USER_ACCESS;
+   global $projectLocked;
+   global $PAGE_TASK;
+
+   //Compute Project Status
+   $strProjStatus = "SELECT locked, revision, associated_id from pev__project WHERE project_id='$str_project'";
+   $statusResult = dbquery($strProjStatus);
+   $statusRow = mysql_fetch_array($statusResult);
+   if($statusRow['associated_id'] != NULL){
+      $project_status = "Revised";
+      $replanDisable = "DISABLED";
+      $lockPlanDisable = "DISABLED";
+      $previousProject = true;
+      $projectLocked = 1;
+      $recordHistoryDisable = "DISABLED";
+   }else{
+      if($statusRow['locked'] == 1){
+         $project_status = "Locked";
+         $replanDisable = "";
+         $lockPlanDisable = "DISABLED";
+         $projectLocked = 1;
+         $locked = "_locked";
+         $recordHistoryDisable = "";
+      }else{
+         $project_status = "Unlocked";
+         $replanDisable = "DISABLED";
+         $lockPlanDisable = "";
+         $projectLocked = 0;
+         $locked = "";
+         $recordHistoryDisable = "DISABLED";
+      }
+      $previousProject = false;
+   }
+
+   if($statusRow['revision'] == 0){
+      $viewPreviousRevision = 0;
+   }else{
+      $viewPreviousRevision = 1;
+   }
+   $projectRevision = $statusRow['revision'];
+
+?>
+<br>
+<script>
+TaskNames = new Array();
+WBSNames = new Array();
+function previousVersion(this_id, curr_id){
+   window.open('tasks.php?previous=1&txt_project='+curr_id+'&this_proj='+this_id,'project_window_'+this_id,'width=800,height=400,scrollbars=yes,resizable=yes');
+}
+</script>
+<fieldset class="<?=$project_status;?>">
+	<legend><b>Project: <?=$str_projectName;?> <br> Status: <?=$project_status;?></b></legend>
+	<table class=list id="tasktable">
+   		<thead id="tasktableHead">
+     			<tr>
+				<th colspan=3>WBS</th>
+<?
+
+/* while we do this again in next monster query, it is easier to do it here so we can
+   loop through and build the header very quickly */
+  $strSQL2 = "SELECT P.project_name,W.wbs_id,W.wbs_name,W.wbs_order FROM pev__wbs AS W ";
+  $strSQL2.= " LEFT JOIN pev__project AS P ON P.project_id=W.project_id";
+  $strSQL2.= " WHERE P.project_id='$str_project'";
+  $strSQL2.= " ORDER BY W.wbs_order ASC, W.wbs_name ASC";
+  $result2 = dbquery($strSQL2);
+
+$tWBS_ARRAY="";
+$numWBS=0;
+$colno = 3;
+while($row2 = mysql_fetch_array($result2)){
+	$numWBS++;
+	$t1=$row2['wbs_id'];
+	$t2=$row2['wbs_name'];
+	$tWBS_ARRAY[$t1]=$t2;
+	echo "\t\t\t\t<th colspan=6 ondblclick=\"return hideColumn($colno)\">".$row2['wbs_name']."</th>\n";
+	$colno += 6;
+}
+$totalCols=3+2+($numWBS*6); /*3 standard on left, 2 on right, 6 per WBS */
+?>
+				<th colspan=2 ondblclick="return hideHours(<?=$colno;?>)">Total Hours</th>
+     			</tr>
+    		</thead>
+    		<thead id="subHead">
+     			<tr>
+				<th scope="col">Action</th>
+				<th scope="col" onclick="return sortTable(1)">Scope Growth</th>
+				<th scope="col" onclick="return sortTable(2)">Task Name</th>
+<?
+$tWBS_INDEX="";
+$temp=0;
+$colcount = 2;
+foreach($tWBS_ARRAY as $key => $val){
+	$temp++;
+	$tWBS_INDEX[$temp]=$key;
+?>
+				<th scope="col" onclick="return sortTable(<?=++$colcount;?>)">POC</th>
+				<th scope="col" onclick="return sortTable(<?=++$colcount;?>)">Due</th>
+				<th scope="col" onclick="return sortTable(<?=++$colcount;?>)">EC</th>
+				<th scope="col" onclick="return sortTable(<?=++$colcount;?>)">Plan Hours</th>
+				<th scope="col" onclick="return sortTable(<?=++$colcount;?>)">Actual Hours</th>
+				<th scope="col" onclick="return sortTable(<?=++$colcount;?>)">%</th>
+<?
+}//end foreach loop
+?>
+				<th scope="col" onclick="return sortTable(<?=++$colcount;?>)">Planned Hours</th>
+				<th scope="col" onclick="return sortTable(<?=++$colcount;?>)">Actual Hours</th>
+
+    			</tr>
+   		</thead>
+   		<tbody id="tasktableBody">
+<?
+//Build the list to pass to the modal-dialog box
+//This will display POC options for a project task
+$strSQL7 = "SELECT PA.person_id,P.first,P.last";
+$strSQL7.= " FROM pev__project_access AS PA ";
+$strSQL7.= " LEFT JOIN pev__person AS P ON P.person_id=PA.person_id";
+$strSQL7.= " WHERE PA.project_id='$str_project'";
+$strSQL7.= " ORDER BY P.last ASC,P.first ASC,P.person_id ASC";
+$result7 = dbquery($strSQL7);
+$ms_list = "<option value=\'\'>-</option>";
+
+//If user is an admin, diplay all personnel with project access, 
+//else only user can see their info
+if(($USER_ACCESS==$ACCESS_ADMIN)|| $_SESSION['dbAdmin']){
+	$ms_list ="<option value=\'\'>-None-</option>";
+	while($row7 = mysql_fetch_array($result7))
+	{
+  		$j1=$row7['person_id'];
+  		$j2=$row7['first'];
+  		$j3=$row7['last'];
+  		debug(10,"testing ($j1/$j2) -- $j3");
+  		$ms_list.="<option value=\'$j1\'>$j3,$j2</option>";
+	}
+}
+else
+{
+	while($row7 = mysql_fetch_array($result7))
+	{
+		if($row7['person_id'] == $_SESSION['paev_userID'])
+		{
+	  		$j1=$row7['person_id'];
+ 	  		$j2=$row7['first'];
+ 	  		$j3=$row7['last'];
+	  		$ms_list ="<option value=\'$j1\'>$j3,$j2</option>";
+		}
+	}
+}
+ /* PUT THE DATA FROM THE DB HERE - START */
+/* in one query - find all tasks. get all wbs info on those tasks. get all person assigned to each wbs/task */
+$strSQL3 = "SELECT T.task_id as TID,T.task_name,T.scope_growth,WT.wbs_id,WT.due_date,WT.ec_date,WT.planned_hours,WT.actual_hours,WT.percent_complete,W.wbs_name,P.first,P.last,W.wbs_order,P.person_id ";
+$strSQL3.= " FROM pev__task AS T ";
+$strSQL3.= " LEFT JOIN pev__wbs_to_task AS WT ON T.task_id=WT.task_id";
+$strSQL3.= " LEFT JOIN pev__wbs AS W ON W.wbs_id=WT.wbs_id";
+$strSQL3.= " LEFT JOIN pev__person_to_wbstask AS PW ON PW.wbs_to_task_id=WT.wbs_to_task_id";
+$strSQL3.= " LEFT JOIN pev__person AS P ON P.person_id=PW.person_id";
+$strSQL3.= " WHERE T.project_id='$str_project'";
+$strSQL3.= " ORDER BY T.task_name ASC, T.task_id ASC, W.wbs_order ASC, W.wbs_name ASC, W.wbs_id ASC";
+$result3 = dbquery($strSQL3);
+$tWBSi=0;
+$last_TID=-1;
+$done1=0;
+$WBS_DISPLAYED=0;
+$ROWS_DISPLAYED=0;
+$rowTotal_PH=0;
+$rowTotal_AH=0;
+$Total_PH=0;
+$Total_AH=0;
+while($row3 = mysql_fetch_array($result3))
+{
+  	$t1=$row3['TID'];
+  	$t2=$row3['task_name']; echo "<script>TaskNames[$t1]='$t2'</script>\n";
+  	$t3=($row3['scope_growth'] == "0")?"":$row3['scope_growth'];
+  	$t4=date_read($row3['due_date']);
+  	$t5=date_read($row3['ec_date']);
+  	$t6=$row3['planned_hours'];
+  	$t7=$row3['actual_hours'];
+  	$t8=$row3['percent_complete'];
+  	$t9=$row3['last'];
+  	$t10=$row3['first'];
+  	$t11=$row3['wbs_name'];
+  	$t12=$row3['wbs_id']; if(strlen($t12)){echo "<script>WBSNames[$t12]='$t11'</script>\n";}
+  	$t13=$row3['person_id'];
+  	if($last_TID!=$t1)
+  	{
+    		$tWBSi=0;
+  	}
+  	else 
+	{
+		$tWBSi=1;
+	}
+  	debug(7,"READING: tWBSi($tWBSi) TASK($t2/$t1) GR:$t3 DATES($t4/$t5) HOURS($t6/$t7) PC:$t8 NAME($t9, $t10) WBS($t11/$t12)");
+	if(!$tWBSi) /* new task means new row */
+	{
+		if(!$done1)
+		{
+  			$done1=1;
+		}
+		else /* complete the row */
+		{
+  			while($WBS_DISPLAYED<$t_order)
+  			{
+    				$WBS_DISPLAYED++;
+    				foreach ($tWBS_INDEX as $key => $val) 
+				{ 
+					if($WBS_DISPLAYED == $key) 
+						$temp=$val; 
+				}
+                                if(!$projectLocked){
+    				   echo "\t\t\t\t<td class=na_poc onclick=\"ms($last_TID,$temp,'$ms_list','','','','','','','tblrow$ROWS_DISPLAYED')\"></td>\n";
+    				   echo "\t\t\t\t<td class=na_due onclick=\"ms($last_TID,$temp,'$ms_list','','','','','','','tblrow$ROWS_DISPLAYED')\"></td>\n";
+    				   echo "\t\t\t\t<td class=na_ec onclick=\"ms($last_TID,$temp,'$ms_list','','','','','','','tblrow$ROWS_DISPLAYED')\"></td>\n";
+    				   echo "\t\t\t\t<td class=na_plan onclick=\"ms($last_TID,$temp,'$ms_list','','','','','','','tblrow$ROWS_DISPLAYED')\"></td>\n";
+    				   echo "\t\t\t\t<td class=na_actual onclick=\"ms($last_TID,$temp,'$ms_list','','','','','','','tblrow$ROWS_DISPLAYED')\"></td>\n";
+    				   echo "\t\t\t\t<td class=na_percent onclick=\"ms($last_TID,$temp,'$ms_list','','','','','','','tblrow$ROWS_DISPLAYED')\"></td>\n";
+                                }else{
+                                   echo "\t\t\t\t<td class=na_poc ></td>\n";
+    				   echo "\t\t\t\t<td class=na_due ></td>\n";
+    				   echo "\t\t\t\t<td class=na_ec ></td>\n";
+    				   echo "\t\t\t\t<td class=na_plan ></td>\n";
+    				   echo "\t\t\t\t<td class=na_actual ></td>\n";
+    				   echo "\t\t\t\t<td class=na_percent ></td>\n";
+                                }
+  			}
+  			echo "\t\t\t\t<td class=hours>$rowTotal_PH</td>\n";
+  			echo "\t\t\t\t<td class=hours>$rowTotal_AH</td>\n";
+  			echo "\t\t\t</tr>\n";
+  			$rowTotal_PH=0; /* start the totaling over at 0 */
+  			$rowTotal_AH=0; /* start the totaling over at 0 */
+			$ROWS_DISPLAYED++;
+			$WBS_DISPLAYED=0;
+		}
+
+?>
+			<tr class="row<?=$ROWS_DISPLAYED%2;?>" id="tblrow<?=$ROWS_DISPLAYED;?>">
+  				<td align="center">
+<?
+		if(!$previousProject)
+		{
+?>
+					<a href="javascript:void(0);" onclick="ms2<?=$locked;?>(<?=$t1;?>,'<?=$row3['scope_growth'];?>','<?=$t2;?>','tblrow<?=$ROWS_DISPLAYED;?>')">
+					<img onmouseover="mo(this)" onmouseout="mt2(this)" border="0" height="15" src="images/blue_butn.gif">
+					<a>
+<?
+		}
+?>
+				</td>
+  				<td style="width:3em;" align="center"><?=$t3;?></td>
+  				<td class="taskname" ondblclick="return myrow(this)"><?=$t2;?></td>
+<?
+
+	}
+	$rowTotal_PH+=$t6;
+	$rowTotal_AH+=$t7;
+	$Total_PH+=$t6;
+	$Total_AH+=$t7;
+	$t_order=0;
+	foreach ($tWBS_ARRAY as $key => $val)
+	{
+  		$t_order++;
+  		if($key==$t12)
+  		{
+    			$WBS_DISPLAYED++;
+    			debug(8,"WBS_DISPLAYED=$WBS_DISPLAYED");
+    			while($WBS_DISPLAYED<$t_order)
+    			{
+      				foreach ($tWBS_INDEX as $key => $val) 
+				{ 
+					if($WBS_DISPLAYED == $key) 
+					$temp=$val; 
+				}
+      				$WBS_DISPLAYED++;
+                                if(!$projectLocked){
+      				   debug(8,"WBS/TASK-ID(#1) WBS-Displayed($WBS_DISPLAYED) TASK-ID($t1) WBS-ID($temp)");
+      				   echo "\t\t\t\t<td class=na_poc onclick=\"ms($t1,$temp,'$ms_list','','','','','','','tblrow$ROWS_DISPLAYED')\"></td>\n";
+     				   echo "\t\t\t\t<td class=na_due onclick=\"ms($t1,$temp,'$ms_list','','','','','','','tblrow$ROWS_DISPLAYED')\"></td>\n";
+      				   echo "\t\t\t\t<td class=na_ec onclick=\"ms($t1,$temp,'$ms_list','','','','','','','tblrow$ROWS_DISPLAYED')\"></td>\n";
+      				   echo "\t\t\t\t<td class=na_plan onclick=\"ms($t1,$temp,'$ms_list','','','','','','','tblrow$ROWS_DISPLAYED')\"></td>\n";
+      				   echo "\t\t\t\t<td class=na_actual onclick=\"ms($t1,$temp,'$ms_list','','','','','','','tblrow$ROWS_DISPLAYED')\"></td>\n";
+      				   echo "\t\t\t\t<td class=na_percent onclick=\"ms($t1,$temp,'$ms_list','','','','','','','tblrow$ROWS_DISPLAYED')\"></td>\n";
+                                }else{
+                                   echo "\t\t\t\t<td class=na_poc ></td>\n";
+    				   echo "\t\t\t\t<td class=na_due ></td>\n";
+    				   echo "\t\t\t\t<td class=na_ec ></td>\n";
+    				   echo "\t\t\t\t<td class=na_plan ></td>\n";
+    				   echo "\t\t\t\t<td class=na_actual ></td>\n";
+    				   echo "\t\t\t\t<td class=na_percent ></td>\n";
+                                }
+    			}
+			$strSQL7 = "SELECT PA.person_id,P.first,P.last";
+			$strSQL7.= " FROM pev__project_access AS PA ";
+			$strSQL7.= " LEFT JOIN pev__person AS P ON P.person_id=PA.person_id";
+			$strSQL7.= " WHERE PA.project_id='$str_project'";
+			$strSQL7.= " ORDER BY P.last ASC,P.first ASC,P.person_id ASC";
+			$result7 = dbquery($strSQL7);
+			$sel_list ='';
+			$sel_list.='<option value=\'\'>-None-</option>';
+			$j4="-None-";
+			$k4=1;
+			$k5=0;
+			while($row7 = mysql_fetch_array($result7))
+			{
+  				$j1=$row7['person_id'];
+  				$j2=$row7['first'];
+  				$j3=$row7['last'];
+  				if($t13==$j1)
+				{
+					$j4="$j3,&nbsp;$j2";
+					$k5=$k4;
+				}
+  				debug(10,"testing ($t13/$t1) -- $j4");
+  				$sel_list.='<option value=\'$j1\'>$j3,$j2</option>';
+  				$k4++;
+			}
+    			$wbsTotal1[$t12]=$t6+(isset($wbsTotal1[$t12])?$wbsTotal1[$t12]:0);
+    			$wbsTotal2[$t12]=$t7+(isset($wbsTotal2[$t12])?$wbsTotal2[$t12]:0);
+    			$wbsPC[$t12]=$t8/100*$t6+(isset($wbsPC[$t12])?$wbsPC[$t12]:0);
+    			debug(10,"WBST1(".$wbsTotal1[$t12].") WBST2(".$wbsTotal2[$t12].")");
+
+
+
+    			debug(10,"t13($t13) userID(".$_SESSION['paev_userID'].")");
+?>
+  				<td class=poc >
+<?
+			if((($t13 && $t13 == $_SESSION['paev_userID']) || $ACCESS_ADMIN==$USER_ACCESS || $_SESSION['dbAdmin']) && !$previousProject)
+			{
+?>
+					<a href="javascript:void(0)" onclick="ms<?=$locked;?>(<?=$t1;?>,<?=$t12;?>,'<?=$ms_list;?>','<?=$k5;?>','<?=$t4;?>','<?=$t5;?>','<?=$t6;?>','<?=$t7;?>','<?=$t8;?>','tblrow<?=$ROWS_DISPLAYED;?>')">
+					<img border=0 height=15 onmouseover=mo(this) onmouseout=mt(this) src="images/orange_butn.gif">
+					</a>
+<?
+			}
+?>
+					&nbsp;<?=$j4;?>
+				</td>
+<?  
+			$temp=""; 
+			if((date_save($t4) < date("U")) && ($t8<100)) 
+			{ 
+				$temp="red_"; 
+			} 
+?>
+  				<td class=<?=$temp;?>date><?=$t4;?></td>
+<?  
+			$temp=""; 
+			if((date_save($t5) < date("U")) && ($t8<100)) 
+			{
+				$temp="red_"; 
+			} 
+?>
+  				<td class="<?=$temp;?>date"><?=$t5;?></td>
+  				<td class="hours"><?=$t6;?></td>
+  				<td class="hours"><?=$t7;?></td>
+<?  
+			$temp=""; 
+			if($t8>=100) 
+			{ 
+				$temp="done_"; 
+			} 
+?>
+  				<td class="<?=$temp;?>percent"><?=$t8;?></td>
+<?
+  		}//end if
+	} //end foreach ; check which column we should process
+	debug(8,"updating last TID: old($last_TID) New($t1)");
+	$last_TID=$t1;
+}//end while loop, fetch another row from the DB 
+
+while($WBS_DISPLAYED<$t_order)
+{
+  	$WBS_DISPLAYED++;
+  	foreach ($tWBS_INDEX as $key => $val) 
+	{ 
+		if($WBS_DISPLAYED == $key) 
+			$temp=$val; 
+	}
+        if(!$projectLocked){
+  	   echo "\t\t\t\t<td class=na_poc onclick=\"ms($t1,$temp,'$ms_list','','','','','','','tblrow$ROWS_DISPLAYED')\"></td>\n";
+  	   echo "\t\t\t\t<td class=na_due onclick=\"ms($t1,$temp,'$ms_list','','','','','','','tblrow$ROWS_DISPLAYED')\"></td>\n";
+  	   echo "\t\t\t\t<td class=na_ec onclick=\"ms($t1,$temp,'$ms_list','','','','','','','tblrow$ROWS_DISPLAYED')\"></td>\n";
+  	   echo "\t\t\t\t<td class=na_plan onclick=\"ms($t1,$temp,'$ms_list','','','','','','','tblrow$ROWS_DISPLAYED')\"></td>\n";
+  	   echo "\t\t\t\t<td class=na_actual onclick=\"ms($t1,$temp,'$ms_list','','','','','','','tblrow$ROWS_DISPLAYED')\"></td>\n";
+  	   echo "\t\t\t\t<td class=na_percent onclick=\"ms($t1,$temp,'$ms_list','','','','','','','tblrow$ROWS_DISPLAYED')\"></td>\n";
+        }else{
+           echo "\t\t\t\t<td class=na_poc ></td>\n";
+           echo "\t\t\t\t<td class=na_due ></td>\n";
+    	   echo "\t\t\t\t<td class=na_ec ></td>\n";
+    	   echo "\t\t\t\t<td class=na_plan ></td>\n";
+    	   echo "\t\t\t\t<td class=na_actual ></td>\n";
+    	   echo "\t\t\t\t<td class=na_percent ></td>\n";
+        }
+}
+?>
+				<td class="hours"><?=$rowTotal_PH;?></td>
+				<td class="hours"><?=$rowTotal_AH;?></td>
+			</tr>
+		</tbody>
+		<tfoot id="tasktableFoot">
+			<tr id="totals">
+				<td class="none"></td>
+				<td class="none"></td>
+				<td class="none"></td>
+<?
+/* this row to show the total Actuals, and total Planned hours */
+$useCols=$totalCols-2; /* total columns less the 2 we need */
+
+
+$percentHours = 0;
+foreach ($tWBS_INDEX as $key => $val)
+{
+	$_t1=isset($wbsTotal1[$val])?$wbsTotal1[$val]:0;
+  	$_t2=isset($wbsTotal2[$val])?$wbsTotal2[$val]:0;
+  	$_t3=isset($wbsPC[$val])?$wbsPC[$val]:0;
+?>
+  				<td class="none"></td>
+  				<td class="none"></td>
+  				<td class="none"></td>
+  				<td class="total" title="WBS Planned Hours"><?=$_t1;?></td>
+  				<td class="total" title="WBS Actual Hours"><?=$_t2;?></td>
+<?
+  	$_t4="";
+  	if($_t1)
+	{
+		$_t4=round($_t3/$_t1*100,1);
+	}
+	else
+	{
+		$_t4 = 0;
+	}
+  	echo "\t\t\t\t<td class=total title=\"WBS Percent Complete\">$_t4</td>\n";
+  	//Add up partial completed tasks of each wbs according to planned hours
+  	$percentHours += ($_t1*$_t4)/100;
+
+}
+?>
+				<td class="total" title="Total Planned Hours for Project"><b><?=$Total_PH;?></b></td>
+				<td class="total" title="Total Actual Hours for Project"><b><?=$Total_AH;?></b></td>
+			</tr>
+		
+<?
+//Calculate Total Project % Complete and Display
+$percentTotal = round(($percentHours/$Total_PH)*100,1);
+$tempCols = $totalCols;
+?>
+		
+			<tr>
+				<td class="project_percent" colspan="<?=$tempCols;?>">Total Project % Complete: <?=$percentTotal;?></td>
+			</tr>
+    			<tr>
+				<td colspan="3" align="left">
+<?if($projectLocked == 0){?>
+					<form action="<?=$PAGE_TASK;?>" method=POST>
+						<input type="hidden" value='<?=$str_project;?>' name="txt_project">
+						<input type="hidden" value='Do Now' name="txt_action">
+						Create 
+						<select name='txt_howmany'>
+							<option value='1'>1</option>
+							<option value='2'>2</option>
+							<option value='3'>3</option>
+							<option value='4'>4</option>
+							<option value='5'>5</option>
+							<option value='6'>6</option>
+							<option value='7'>7</option>
+							<option value='8'>8</option>
+							<option value='9'>9</option>
+							<option value='10'>10</option>
+						</select> new tasks 
+						<input class="but" name="txt_action2" type="submit" value="Add">
+					</form>
+<?}?>
+				</td>
+				<td colspan="<?=($totalCols-3);?>" align="right">
+					<form>
+						<input type="hidden" value='<?=$str_project;?>' name="txt_project">
+						<input type="hidden" value='Do Now' name="txt_action">
+<?
+	if($ACCESS_ADMIN==$USER_ACCESS || $_SESSION['dbAdmin'])
+	{
+           if($viewPreviousRevision){
+?> 
+                                                <input class="but" type="button" value="View Previous Version" onclick="previousVersion(<?=$str_project;?>, <?=$cur_project;?>);">
+<?         }
+           if($_SESSION['dbAdmin']){
+?>
+                                                <input class="but" type="button" value="Unlock Plan" <?=$replanDisable;?> onclick="unlockProject();">
+<?         }
+?>
+                                                <input class="but" type="button" value="Lock Plan" <?=$lockPlanDisable;?> onclick="lockProject();">
+			                        <input class="but" type="button" value="Re-plan" <?=$replanDisable;?> onclick="replanProject();">
+						<input class="but" type="submit" name="txt_action2" value="Record History" <?=$recordHistoryDisable;?>>
+<?
+	}
+?>
+					</form>
+				</td>
+    			</tr>
+ 		</tfoot>
+	</table>
+</fieldset>
+<?
+} //End displayTable function
+
+/******************************************/
+/* COMPUTING - SHOW OUTPUT - END          */
+/******************************************/
+
+
+?>

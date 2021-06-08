@@ -1,0 +1,187 @@
+body {font-size: 10px; color: #000; background-color: #FFF; position:relative; top:105px;}
+a {color: white;}
+.header2 {background-color: #002244; text-align:right;height: 95px;font-weight: bolder; font-size: 14px; left:-9px; right:8px;  top: -117px; position:relative; z-index:1001; width:100%; min-width:1245px;}
+.headerbackground2 {background-color:#FFFFFF; left:0; top:0; height:144px;  z-index:-100000;}
+.header2 img {float:left; margin-left: 30px;}
+.toolbarbackground {left:8px; right:8px; top:90px; z-index:1000; height:50px; position:relative; width:100%;}
+.toolbar {background-color:#e8e8e8; height:50px; position:relative; top:-180px; left:-9px; width:100%;}
+.toolbarpanel {background-color:#f9f9f9;width:100%;}
+.date {text-align: center;}
+.red_date {text-align: left; border: 1px solid #F00; color: #800;}
+.red_date
+.red_hours{text-align: left; border: 1px solid #F00; color: #800;}
+
+.date input {width: 6em; font-size:10px;}
+.hours {text-align: right;}
+.hours input {width:3em;}
+.poc input {width:5em;}
+.percent {text-align: right;}
+.done_percent {text-align: left; color: #00F;}
+.percent input {width:3em;}
+.text {text-align:right; width: 10em;}
+.select {text-align:right; width: 10em;}
+.warn {border: 1px solid #ADF; background-color: #DDD; font-size: 10px;}
+.error {border: 2px solid red; color: #800;background-color: #DDD; font-size: 10px;}
+.debug {color: red; background-color: black; font-size: 10px;}
+.status {border: 1px solid #DEF;color: black; background-color: #ACF; font-size: 10px; z-index:700;}
+.na {background-color: #BDBDBD; text-align:center;}
+.none {background-color: #DDD;}
+.row0 {background-color: #EEF;}
+.row1 {background-color: #EEC;}
+.highlightrow {background-color: #acc;}
+.total {background-color: #EEA; font-weight: bold; text-align:right;}
+.dbstat {background-color: #DDD;font-size:10px;color:#000;border: 1px solid #000;}
+.pagetime {background-color: #DDD;font-size:10px;color:#000;border: 1px solid #000;}
+.version {background-color: #DDD;font-size:10px;color:#000;border: 1px solid #000;}
+.list {background-color: #DDD; border-spacing: 1px; border-width: 2px; border-style: solid; border-color: #000;}
+.but {display: inline; padding: 1px;font-size:10px; font-weight: bold; background-color: #FFF; color: #060; border: 1px solid #884; cursor:pointer;}
+.but[disabled] {display: inline; padding: 1px;font-size:10px; font-weight: bold; background-color: #ccc; color: #336633; border: 1px solid #884; cursor:default;}
+.mtab {border: 1px solid #444; background-color: #ADF;}
+.taskname {text-align:left; font-weight:bold;}
+.project_percent {font-weight: bold; text-align:center; font-weight:bold; background-color:#EEA;}
+.total_percent {background-color: #EEC; font-weight: bold; text-align:right;}
+.link {color:#000;}
+.rulehead {text-align:center; font-size:13px;}
+.rule {text-align:center; font-size:12px;}
+.headerinfo{font-size:medium;}
+.hidden{
+z-index: 10;
+}
+
+.na_poc {background-color: #bdbdbd; border-bottom: 1px solid #000000; border-left: 1px solid #000000; border-top: 1px solid #000000; text-align:center; cursor: pointer;}
+.na_due {background-color: #bdbdbd; border-bottom: 1px solid #000000; border-top: 1px solid #000000; text-align:center; cursor: pointer;}
+.na_ec {background-color: #bdbdbd; border-bottom: 1px solid #000000; border-top: 1px solid #000000; text-align:center; cursor: pointer;}
+.na_plan {background-color: #bdbdbd; border-bottom: 1px solid #000000; border-top: 1px solid #000000; text-align:center; cursor: pointer;}
+.na_actual {background-color: #bdbdbd; border-bottom: 1px solid #000000; border-top: 1px solid #000000;  text-align:center; cursor: pointer;}
+.na_percent {background-color: #bdbdbd; border-bottom: 1px solid #000000; border-right: 1px solid #000000; border-top: 1px solid #000000; text-align:center; cursor: pointer;}
+
+.paragraph{
+padding-top: 10px;
+font-size: medium;
+white-space: pre;
+}
+.paragraph a{
+color: blue;
+}
+
+img {border:0;}
+fieldset {background-color: #FFF; border: 1px solid #000;}
+legend {margin-top: 5px; background-color: #FFF;font-size: 10px; font-weight: bolder; color: #440;}
+
+#treegrid td {border-top: 1px dotted #CCCCCC; font-size: 10px; white-space:nowrap;}
+.actual {color: black; background-color: #AAA; font-size: 10px; text-align: right;}
+.info {text-align: center;}
+#treegrid td.td_hidden {border-left: 1px hidden #DDDDDD;}
+th {font-size: 10px; font-weight: bolder;}
+select {font-size: 10px;}
+
+menuBar,
+.menuBar a.menuButton,
+.menuBar a.menuButton1,
+.menu,
+.menu a.menuItem {
+  font-family: Verdana, "MS Sans Serif", Arial, sans-serif;
+  font-size: 8pt;
+  font-style: normal;
+  font-weight: normal;
+  line-height: 10pt;
+  color: #004;
+}
+
+.menuBar {
+  background-color: #FFF;
+  border: 2px solid;
+  border-color: #002 #000 #000 #002;
+  padding: 4px 2px 4px 2px;
+  text-align: left;
+}
+
+.menuBar a.menuButton {
+  background-color: transparent;
+  border: 1px solid #FFF;
+  color: #004;
+  cursor: default;
+  font-weight: bold;
+  margin: 1px;
+  padding: 2px 6px 2px 6px;
+  text-decoration: none;
+}
+.menuBar a.menuButton1 {
+  background-color: #FFA;
+  border: 1px solid #8F8;
+  color: #004;
+  cursor: default;
+  font-weight: bold;
+  margin: 1px;
+  padding: 2px 6px 2px 6px;
+  text-decoration: none;
+}
+
+.menuBar a.menuButton:hover {
+  background-color: transparent;
+  border-color: #330 #220 #220 #330;
+}
+
+.menuBar a.menuButtonActive,
+.menuBar a.menuButtonActive:hover {
+  background-color: #033;
+  border-color: #330 #220 #220 #330;
+  color: #DFF;
+  position: relative;
+  left: 1px;
+  top: 1px;
+}
+
+/*Fieldset Styles */
+.Unlocked{
+   border: 3px solid #ff9933;
+   background-color: #ffcc33;
+   position: relative;
+   padding: 3px 6px 8px;
+}
+
+.Unlocked legend{
+  margin-top: -1.25em;
+  position: relative;
+  padding: 0.2em 0.5em;
+  border:1px solid #ff9933;
+  color:black;
+  font-size:14px;
+  text-align:left;
+  line-height: 1.3;
+}
+
+.Locked{
+   border: 3px solid #00ff00;
+   background-color: #99ff99;
+   position: relative;
+   padding: 3px 6px 8px;
+}
+
+.Locked legend{
+  margin-top: -1.25em;
+  position: relative;
+  padding: 0.2em 0.5em;
+  border:1px solid #00ff00;
+  color:black;
+  font-size:14px;
+  text-align:left;
+  line-height: 1.3;
+}
+
+.Revised{
+   border: 3px solid #ff0000;
+   background-color: #ff9999;
+   position: relative;
+}
+
+.Revised legend{
+  margin-top: -1.25em;
+  position: relative;
+  padding: 0.2em 0.5em;
+  border:1px solid #ff0000;
+  color:black;
+  font-size:14px;
+  text-align:left;
+  line-height: 1.3;
+}

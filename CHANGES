@@ -1,0 +1,60 @@
+0.1.3
+ - changed version
+ - fixed title on Man Hours graph to have project name
+ - placed dividers on CV/SV chart at 0-Yaxis and 0-Xaxis
+ - put restrictions based upon access level to tasks page
+ - updated bulleye graph range calculation
+ - changed cosmetics of form buttons
+ - added events to DB and config file: planned, estimated, actual dates (actual date denotes completed)
+ - added a graph for showing the events per project - shows planned vs estimated or actual
+ - added a show-graph page, which will show the larger version of an image/graph inside the menu-html structure
+
+0.1.2
+ - added bulls-eye graph. fixed SPI graph. meter graphs added for CPI/SPI
+ - corrected deleting WBS in a project to properly delete all tasks for that WBS
+ 
+0.1.0
+ - beta release.
+ - updated to add in new graph types (man hours w/ EAC, CPI/SPI)
+ - session remembers selected project between tasks/graphs pages
+ - for servers with no mcrypt available, the code will store passwords as text (in the clear)
+
+0.0.8
+ - can now record the WBS history (total actual hours, total planned hours, total % complete)
+
+0.0.7
+ - login continues to page desired first
+ - project create/edit now has added field of START_DATE (required MySQL DB structure change)
+ - all paramaters posted are now filtered to only allow A-Za-z0-9 and the space character
+ - replaced graphic button.  added animation to the mouse over/out of those buttons
+ - added WBS total for Planned and Actual Hours (for each WBS)
+ - added WBS total % complete (for each WBS)
+
+0.0.6
+ - changed to have new tasks created - to create empty rows (tasks)
+ - changed enable task-wbs to use dhtml-box to collect info and post that one field when done
+ - wbs update works with new DHTML dialog box.
+ - task update works also with DHTML dialog box.
+ - wbs and task can be deleted with double checkbox confirm in dialog box.
+
+0.0.2
+ - fixed table/fields to have specific names not general (like project_id instead of id)
+ - Added an ORDER to the WBS (this is the column order to show them on the TASKS page
+ - tasks can be added now. tasks are shown correctly after they have been added
+ - wbs-tasks can not be enabled after a task is added with no data in a given wbs
+ - pages now show the mysql query total count - and how long they took
+ - POC on tasks now uses select list - of those that have been granted access.
+ - POC for WBS/TASKS show value stored in an array (so it can be changed)
+ - TASKS can now be updated
+ - TASKS now show their total Planned and Actual hours per row
+ - TASKS dates now working
+
+0.0.1
+ - menu structure established
+ - authentication implemented
+ - security checking put into place
+ - hacking tampering - must run files as intended
+ - USER creation, editing
+ - PROJECT creation, editing
+ - PROJECT WBS creation, editing
+ - PROJECT ACCESS creation, editing
